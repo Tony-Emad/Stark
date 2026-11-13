@@ -116,3 +116,9 @@ enum FaceMatcher {
         return distance
     }
 }
+
+enum StarkMatchPolicy {
+    static func accepts(distance: Float, livenessScore: Double, confidence: Float) -> Bool {
+        distance <= FaceMatcher.matchThreshold && livenessScore >= 0.30 && confidence >= 0.50
+    }
+}

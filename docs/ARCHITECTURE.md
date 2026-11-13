@@ -27,6 +27,7 @@ StarkApp
 ├── CredentialVault
 ├── LocalAuthCoordinator
 ├── LockCompanion
+├── MenuBarExtra / launch-at-login
 └── Distribution / signing / updater
 ```
 
@@ -44,6 +45,10 @@ Camera frame → Vision detection → face crop → feature print
 
 identity + liveness + authorized session → user-visible unlock action
 ```
+
+The lock companion is an in-session surface only. It can lock Stark's own
+session and require a fresh Touch ID/password authorization; it does not
+replace or impersonate the macOS system login window.
 
 Camera frames should be processed in memory and discarded. Only the minimum
 derived data needed for the local product should be retained.

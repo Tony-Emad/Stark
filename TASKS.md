@@ -20,6 +20,9 @@ Copyright: © 2026 Tony Emad. All rights reserved.
 - [x] Add explicit enrollment deletion and reset flows.
 - [x] Implement identity matching with a conservative prototype threshold.
 - [x] Implement liveness analysis as an independent motion gate.
+- [x] Add in-session lock companion with manual recovery.
+- [x] Add menu-bar controls, camera selection, launch-at-login, and auto-lock.
+- [x] Add unit test target for the match policy.
 
 ## P0 — next build
 
@@ -31,6 +34,7 @@ Copyright: © 2026 Tony Emad. All rights reserved.
 - [ ] Add replay/photo/screen spoof test fixtures.
 - [ ] Add camera selection and external-display behavior.
 - [ ] Add session expiry and automatic re-authorization.
+- [x] Add configurable auto-lock and Touch ID/password re-authorization.
 - [ ] Document threat model and recovery behavior.
 
 ## P2 — product polish
@@ -39,12 +43,12 @@ Copyright: © 2026 Tony Emad. All rights reserved.
 - [ ] Add onboarding, settings, and permission recovery screens.
 - [ ] Add menu-bar controls and launch-at-login preference.
 - [x] Add proper Stark `.icns` asset.
-- [ ] Add accessibility labels and keyboard navigation.
+- [x] Add accessibility labels to critical unlock controls.
 
 ## P3 — distribution
 
 - [ ] Add Developer ID signing configuration.
-- [ ] Add notarization and stapling workflow.
+- [x] Add Developer ID signing and notarization scripts without embedded secrets.
 - [ ] Test clean installation from DMG.
 - [ ] Test uninstall and complete local-data deletion.
 - [ ] Review all third-party licenses before release.

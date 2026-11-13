@@ -32,6 +32,10 @@ swift build
 The generated DMG is for local testing. Public distribution requires Developer
 ID signing and notarization.
 
+For a signed release, set `STARK_SIGNING_IDENTITY` before building, then set
+`STARK_NOTARY_PROFILE` to an existing `notarytool` keychain profile and run
+`./scripts/notarize_dmg.sh`.
+
 ## Ownership
 
 Copyright © 2026 Tony Emad. All rights reserved. See `LICENSE`, `NOTICE`, and

@@ -1,6 +1,7 @@
 import AppKit
 @preconcurrency import AVFoundation
 import LocalAuthentication
+import ServiceManagement
 import SwiftUI
 import Vision
 
@@ -24,6 +25,27 @@ struct StarkApp: App {
 
         Settings {
             StarkSettingsView(model: model)
+        }
+
+        MenuBarExtra("Stark", systemImage: "faceid") {
+            Button(model.isLocked ? "Stark is locked" : "Lock Stark now") {
+                model.lockNow()
+                StarkWindowController.showPanel()
+            }
+            .disabled(model.identityStore.sampleCount == 0)
+
+            Button("Open Stark setup") {
+                StarkWindowController.showPanel()
+            }
+
+            Divider()
+            Toggle("Launch at login", isOn: Binding(
+                get: { model.launchAtLoginEnabled },
+                set: { model.setLaunchAtLogin($0) }
+            ))
+            SettingsLink { Text("Stark settings…") }
+            Divider()
+            Button("Quit Stark") { NSApp.terminate(nil) }
         }
     }
 }
@@ -56,6 +78,11 @@ enum StarkSetupStep: Int, CaseIterable {
     case ready
 }
 
+struct CameraChoice: Identifiable, Hashable {
+    let id: String
+    let name: String
+}
+
 @MainActor
 final class StarkModel: NSObject, ObservableObject {
     @Published var phase: StarkPhase = .idle
@@ -68,19 +95,32 @@ final class StarkModel: NSObject, ObservableObject {
     @Published var isLive = false
     @Published var matchState: FaceMatchState = .notEnrolled
     @Published var enrollmentSamples = 0
+    @Published var isLocked = false
+    @Published var launchAtLoginEnabled = false
+    @Published var selectedCameraID: String?
+    @Published private(set) var cameras: [CameraChoice] = []
+    @Published var autoLockMinutes: Int
 
     let session = AVCaptureSession()
     let identityStore: IdentityStore
     private let cameraQueue = DispatchQueue(label: "com.stark.camera")
     private var isConfigured = false
     private var latestFeaturePrintData: Data?
+    private var currentInput: AVCaptureDeviceInput?
+    private var currentOutput: AVCaptureVideoDataOutput?
+    private var autoLockTask: Task<Void, Never>?
 
     let poses = ["center", "top right", "right", "bottom right", "bottom", "bottom left", "left", "top left", "top"]
 
     override init() {
         identityStore = IdentityStore()
+        let storedAutoLockMinutes = UserDefaults.standard.integer(forKey: "stark.auto-lock-minutes")
+        autoLockMinutes = max(1, storedAutoLockMinutes == 0 ? 5 : storedAutoLockMinutes)
         super.init()
         enrollmentSamples = identityStore.sampleCount
+        selectedCameraID = UserDefaults.standard.string(forKey: "stark.camera.id")
+        launchAtLoginEnabled = SMAppService.mainApp.status == .enabled
+        refreshCameras()
         if enrollmentSamples >= poses.count {
             setupStep = .ready
             detail = "Stark is secured on this Mac."
@@ -116,12 +156,84 @@ final class StarkModel: NSObject, ObservableObject {
             enrollmentSamples = 0
             poseIndex = 0
             setupStep = .faceScan
+            isLocked = false
             matchState = .notEnrolled
             detail = "Face setup deleted from this Mac."
             startCamera()
         } catch {
             detail = "Could not delete the saved face setup: \(error.localizedDescription)"
         }
+    }
+
+    func lockNow() {
+        guard identityStore.sampleCount > 0 else {
+            detail = "Complete face setup before locking Stark."
+            return
+        }
+        isLocked = true
+        detail = "Look at the camera to verify your identity."
+        startCamera()
+    }
+
+    func unlockFromFace() {
+        guard isLocked else { return }
+        guard case .matched(let distance) = matchState,
+              StarkMatchPolicy.accepts(distance: distance, livenessScore: livenessScore, confidence: faceConfidence) else {
+            detail = "Face match and liveness must both pass before authorization."
+            return
+        }
+        authorizeWithTouchIDOrPassword()
+    }
+
+    func setLaunchAtLogin(_ enabled: Bool) {
+        do {
+            if enabled {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+            launchAtLoginEnabled = SMAppService.mainApp.status == .enabled
+        } catch {
+            launchAtLoginEnabled = SMAppService.mainApp.status == .enabled
+            detail = "Could not change launch-at-login: \(error.localizedDescription)"
+        }
+    }
+
+    func setAutoLockMinutes(_ minutes: Int) {
+        autoLockMinutes = min(max(minutes, 1), 60)
+        UserDefaults.standard.set(autoLockMinutes, forKey: "stark.auto-lock-minutes")
+        if !isLocked { armAutoLock() }
+    }
+
+    func refreshCameras() {
+        let discovery = AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.builtInWideAngleCamera, .external],
+            mediaType: .video,
+            position: .unspecified
+        )
+        cameras = discovery.devices.map { CameraChoice(id: $0.uniqueID, name: $0.localizedName) }
+        if selectedCameraID == nil || !cameras.contains(where: { $0.id == selectedCameraID }) {
+            selectedCameraID = cameras.first?.id
+        }
+    }
+
+    func selectCamera(_ id: String) {
+        guard selectedCameraID != id else { return }
+        selectedCameraID = id
+        UserDefaults.standard.set(id, forKey: "stark.camera.id")
+        guard isConfigured else { return }
+
+        let captureSession = session
+        cameraQueue.async { captureSession.stopRunning() }
+        session.beginConfiguration()
+        if let currentInput { session.removeInput(currentInput) }
+        if let currentOutput { session.removeOutput(currentOutput) }
+        session.commitConfiguration()
+        currentInput = nil
+        currentOutput = nil
+        isConfigured = false
+        isRunning = false
+        startCamera()
     }
 
     func advanceSetup() {
@@ -210,8 +322,14 @@ final class StarkModel: NSObject, ObservableObject {
                 guard let self else { return }
                 if success {
                     self.phase = .authorized
-                    self.setupStep = .ready
-                    self.detail = "Stark is secured on this Mac."
+                    if self.isLocked {
+                        self.isLocked = false
+                        self.detail = "Stark unlocked with Touch ID or password."
+                    } else {
+                        self.setupStep = .ready
+                        self.detail = "Stark is secured on this Mac."
+                    }
+                    self.armAutoLock()
                 } else {
                     self.detail = evaluationError?.localizedDescription ?? "Authorization cancelled."
                 }
@@ -224,7 +342,13 @@ final class StarkModel: NSObject, ObservableObject {
             session.beginConfiguration()
             session.sessionPreset = .high
 
-            guard let camera = AVCaptureDevice.default(for: .video),
+            let discovery = AVCaptureDevice.DiscoverySession(
+                deviceTypes: [.builtInWideAngleCamera, .external],
+                mediaType: .video,
+                position: .unspecified
+            )
+            let camera = discovery.devices.first(where: { $0.uniqueID == selectedCameraID }) ?? discovery.devices.first
+            guard let camera,
                   let input = try? AVCaptureDeviceInput(device: camera),
                   session.canAddInput(input) else {
                 session.commitConfiguration()
@@ -233,6 +357,7 @@ final class StarkModel: NSObject, ObservableObject {
                 return
             }
             session.addInput(input)
+            currentInput = input
 
             let output = AVCaptureVideoDataOutput()
             output.alwaysDiscardsLateVideoFrames = true
@@ -243,6 +368,7 @@ final class StarkModel: NSObject, ObservableObject {
                 return
             }
             session.addOutput(output)
+            currentOutput = output
             session.commitConfiguration()
             isConfigured = true
         }
@@ -255,6 +381,16 @@ final class StarkModel: NSObject, ObservableObject {
         cameraQueue.async { [weak self] in
             captureSession.startRunning()
             _ = self
+        }
+    }
+
+    private func armAutoLock() {
+        autoLockTask?.cancel()
+        guard !isLocked, identityStore.sampleCount > 0 else { return }
+        autoLockTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(self?.autoLockMinutes ?? 5) * 60 * 1_000_000_000)
+            guard !Task.isCancelled else { return }
+            self?.lockNow()
         }
     }
 }
@@ -337,6 +473,15 @@ struct StarkNotchView: View {
 
     @ViewBuilder
     private var content: some View {
+        if model.isLocked {
+            lockContent
+        } else {
+            setupContent
+        }
+    }
+
+    @ViewBuilder
+    private var setupContent: some View {
         switch model.setupStep {
         case .welcome:
             VStack(spacing: 16) {
@@ -385,6 +530,34 @@ struct StarkNotchView: View {
                     .foregroundStyle(.white.opacity(0.58))
                 primaryButton("Done", action: model.advanceSetup)
             }
+        }
+    }
+
+    private var lockContent: some View {
+        VStack(spacing: 14) {
+            ZStack {
+                TickRing(progress: model.isLive ? 1 : model.livenessScore).frame(width: 220, height: 220)
+                CameraPreview(session: model.session)
+                    .frame(width: 154, height: 154)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(.white.opacity(0.18), lineWidth: 1))
+            }
+            Text("Stark is locked")
+                .font(.system(size: 20, weight: .semibold, design: .rounded))
+            Text(model.faceStatusText)
+                .font(.system(size: 11))
+                .foregroundStyle(.white.opacity(0.58))
+            Button("Verify and unlock") {
+                model.unlockFromFace()
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(!model.isLive)
+            .accessibilityLabel("Verify your live face and unlock Stark")
+            Button("Use Touch ID / password") {
+                model.authorizeWithTouchIDOrPassword()
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white.opacity(0.72))
         }
     }
 
@@ -485,6 +658,13 @@ enum StarkWindowController {
         if let window = NSApp.windows.first(where: { $0.contentView != nil }) { configure(window) }
     }
 
+    @MainActor
+    static func showPanel() {
+        configureExistingWindow()
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.windows.first(where: { $0.contentView != nil })?.makeKeyAndOrderFront(nil)
+    }
+
     static func configure(_ window: NSWindow) {
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
@@ -540,6 +720,32 @@ struct StarkSettingsView: View {
             Section("Permissions") {
                 Text("Camera access is required for local face detection. Accessibility permission will only be needed for an explicitly opted-in password-entry bridge in a later phase.")
                     .fixedSize(horizontal: false, vertical: true)
+            }
+            Section("Camera") {
+                if model.cameras.isEmpty {
+                    Text("No camera detected")
+                        .foregroundStyle(.secondary)
+                } else {
+                    Picker("Camera", selection: Binding(
+                        get: { model.selectedCameraID ?? model.cameras[0].id },
+                        set: { model.selectCamera($0) }
+                    )) {
+                        ForEach(model.cameras) { camera in
+                            Text(camera.name).tag(camera.id)
+                        }
+                    }
+                }
+                Button("Refresh cameras") { model.refreshCameras() }
+            }
+            Section("Session") {
+                Stepper(
+                    "Auto-lock after \(model.autoLockMinutes) minutes",
+                    value: Binding(
+                        get: { model.autoLockMinutes },
+                        set: { model.setAutoLockMinutes($0) }
+                    ),
+                    in: 1...60
+                )
             }
             Section("Local face setup") {
                 Text("Saved samples: \(model.enrollmentSamples)")

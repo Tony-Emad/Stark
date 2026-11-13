@@ -14,6 +14,10 @@ let package = Package(
             name: "Stark",
             path: "Sources/Stark",
             resources: [.process("Resources")]
+        ),
+        .testTarget(
+            name: "StarkTests",
+            dependencies: ["Stark"]
         )
     ]
 )

@@ -20,9 +20,14 @@ cp -R "$BUILD_DIR/Stark_Stark.bundle" "$APP_DIR/Contents/Resources/Stark_Stark.b
 ln -s /Applications "$ROOT_DIR/dist/Stark-dmg/Applications"
 cp -R "$APP_DIR" "$ROOT_DIR/dist/Stark-dmg/Stark.app"
 
-# Ad-hoc signing is suitable for local testing. Developer ID signing and notarization
-# are required before distributing the DMG to other Macs.
-codesign --force --deep --sign - "$APP_DIR"
+# Ad-hoc signing is the local default. Set STARK_SIGNING_IDENTITY to a
+# Developer ID identity for a distributable build.
+SIGNING_IDENTITY="${STARK_SIGNING_IDENTITY:--}"
+if [[ "$SIGNING_IDENTITY" == "-" ]]; then
+    codesign --force --deep --sign - "$APP_DIR"
+else
+    codesign --force --deep --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$APP_DIR"
+fi
 rm -rf "$ROOT_DIR/dist/Stark-dmg/Stark.app"
 cp -R "$APP_DIR" "$ROOT_DIR/dist/Stark-dmg/Stark.app"
 hdiutil create -volname "Stark" -srcfolder "$ROOT_DIR/dist/Stark-dmg" -ov -format UDZO "$DMG_PATH" >/dev/null

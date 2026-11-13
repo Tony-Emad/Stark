@@ -25,6 +25,7 @@ Copyright: © 2026 Tony Emad. All rights reserved.
 - Make camera, Accessibility, and credential features independently revocable.
 - Provide an always-available manual recovery path.
 - Record security events without biometric data or password content.
+- Keep the system-login password-entry bridge disabled by default.
 
 ## Release review
 

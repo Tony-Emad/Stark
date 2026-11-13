@@ -43,26 +43,26 @@ Status: prototype implemented; validation planned.
 
 ## Phase 3 — lock companion
 
-Status: planned.
+Status: complete for the in-session MVP.
 
-- Add a non-spoofing in-session lock companion or screensaver-style surface.
+- Add a non-spoofing in-session lock companion surface. (done)
+- Add manual lock, menu-bar controls, auto-lock, and Touch ID/password recovery. (done)
 - Observe supported sleep/wake and lock/unlock transitions.
 - Avoid impersonating Apple's system login window.
 
 ## Phase 4 — optional convenience bridge
 
-Status: decision required.
+Status: intentionally deferred.
 
-- Evaluate whether a narrow Accessibility password-entry bridge is acceptable.
-- Keep it off by default and require explicit consent.
-- Require a recent Touch ID/password authorization before unwrapping any secret.
-- Never log, sync, or persist the raw password in ordinary files.
+The system-login password-entry bridge remains disabled because a camera scan
+must not be represented as a direct macOS login authorization. Stark uses the
+public Touch ID/password prompt for recovery instead.
 
 ## Phase 5 — release
 
-Status: planned.
+Status: complete for local release automation.
 
-- Add a production `.icns` icon.
-- Configure Developer ID signing and notarization.
+- Add a production `.icns` icon. (done)
+- Configure Developer ID signing and notarization scripts. (done; credentials remain external)
 - Test Apple Silicon and Intel compatibility if both are supported.
-- Publish privacy, security, recovery, and uninstall documentation.
+- Publish privacy, security, recovery, and uninstall documentation. (privacy and security done)
