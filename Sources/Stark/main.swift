@@ -494,7 +494,11 @@ final class StarkModel: NSObject, ObservableObject {
         let captureSession = session
         cameraQueue.async { [weak self] in
             captureSession.startRunning()
-            _ = self
+            Task { @MainActor in
+                guard let self,
+                      let connection = self.currentOutput?.connection(with: .video) else { return }
+                configureNaturalCameraConnection(connection)
+            }
         }
     }
 
@@ -799,7 +803,9 @@ enum StarkWindowController {
     private static var isPanelHidden = false
 
     static func configureExistingWindow() {
-        if let window = panelWindow() { configure(window) }
+        guard let window = panelWindow() else { return }
+        removeDuplicatePanels(keeping: window)
+        configure(window)
     }
 
     static func showPanel() {
@@ -807,13 +813,13 @@ enum StarkWindowController {
         NotificationCenter.default.post(name: .starkPanelShowRequested, object: nil)
         configureExistingWindow()
         NSApp.activate(ignoringOtherApps: true)
-        if let window = panelWindow() {
-            window.alphaValue = 1
-            window.ignoresMouseEvents = false
-            window.setContentSize(panelSize)
-            position(window, size: panelSize)
-            window.makeKeyAndOrderFront(nil)
-        }
+        guard let window = panelWindow() else { return }
+        removeDuplicatePanels(keeping: window)
+        window.alphaValue = 1
+        window.ignoresMouseEvents = false
+        window.setContentSize(panelSize)
+        position(window, size: panelSize)
+        window.makeKeyAndOrderFront(nil)
     }
 
     static func reopenFromDock() {
@@ -837,8 +843,20 @@ enum StarkWindowController {
     }
 
     private static func panelWindow() -> NSWindow? {
-        NSApp.windows.first(where: { $0.identifier == panelIdentifier })
-            ?? NSApp.windows.first(where: { $0.title == "Stark" })
+        panelWindows().first
+    }
+
+    private static func panelWindows() -> [NSWindow] {
+        NSApp.windows.filter { window in
+            window.identifier == panelIdentifier || window.title == "Stark"
+        }
+    }
+
+    private static func removeDuplicatePanels(keeping window: NSWindow) {
+        for duplicate in panelWindows() where duplicate !== window {
+            duplicate.orderOut(nil)
+            duplicate.close()
+        }
     }
 
     static func configure(_ window: NSWindow) {
@@ -870,14 +888,18 @@ enum StarkWindowController {
 }
 
 private func configureNaturalCameraConnection(_ connection: AVCaptureConnection) {
+    if connection.isVideoMirroringSupported {
+        // Do not allow AVFoundation to restore the front-camera selfie mirror.
+        // The scan preview and the frame used by Vision must show the same
+        // natural left/right orientation.
+        connection.automaticallyAdjustsVideoMirroring = false
+        connection.isVideoMirrored = false
+    }
     if #available(macOS 14.0, *), connection.isVideoRotationAngleSupported(0) {
         // Mac cameras use their native landscape sensor orientation. Keeping
         // the capture pipeline at zero degrees prevents rotated face geometry
         // from reaching Vision and keeps the preview aligned with the scan UI.
         connection.videoRotationAngle = 0
-    }
-    if connection.isVideoMirroringSupported {
-        connection.isVideoMirrored = false
     }
 }
 
@@ -923,6 +945,19 @@ final class PreviewView: NSView {
     func updateMirroring() {
         guard let connection = previewLayer.connection else { return }
         configureNaturalCameraConnection(connection)
+    }
+
+    override func layout() {
+        super.layout()
+        // The preview-layer connection can be created after SwiftUI first
+        // assigns the session, so reapply the natural orientation during the
+        // first layout pass and whenever the camera session changes size.
+        updateMirroring()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        updateMirroring()
     }
 }
 
