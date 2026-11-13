@@ -707,9 +707,26 @@ struct CameraPreview: NSViewRepresentable {
 }
 
 final class PreviewView: NSView {
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer = AVCaptureVideoPreviewLayer()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        wantsLayer = true
+        layer = AVCaptureVideoPreviewLayer()
+    }
+
     override func makeBackingLayer() -> CALayer { AVCaptureVideoPreviewLayer() }
 
-    var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
+    var previewLayer: AVCaptureVideoPreviewLayer {
+        if let previewLayer = layer as? AVCaptureVideoPreviewLayer { return previewLayer }
+        let previewLayer = AVCaptureVideoPreviewLayer()
+        layer = previewLayer
+        return previewLayer
+    }
 }
 
 struct StarkSettingsView: View {
