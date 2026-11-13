@@ -2,6 +2,8 @@
 build/
 DerivedData/
 .build/
+.build-arm64/
+.build-x86_64/
 *.xcuserstate
 
 # Xcode per-user state (schemes, breakpoints)

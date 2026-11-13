@@ -27,6 +27,7 @@ StarkApp
 ├── CredentialVault
 ├── LocalAuthCoordinator
 ├── LockCompanion
+├── LockCompanionMonitor (sleep/wake re-lock)
 ├── MenuBarExtra / launch-at-login
 └── Distribution / signing / updater
 ```

@@ -22,6 +22,7 @@ Copyright: © 2026 Tony Emad. All rights reserved.
 - [x] Implement liveness analysis as an independent motion gate.
 - [x] Add in-session lock companion with manual recovery.
 - [x] Add menu-bar controls, camera selection, launch-at-login, and auto-lock.
+- [x] Re-lock Stark's own session around system sleep/wake notifications.
 - [x] Add unit test target for the match policy.
 
 ## P0 — next build
@@ -43,12 +44,14 @@ Copyright: © 2026 Tony Emad. All rights reserved.
 - [ ] Add onboarding, settings, and permission recovery screens.
 - [ ] Add menu-bar controls and launch-at-login preference.
 - [x] Add proper Stark `.icns` asset.
+- [x] Verify arm64 and x86_64 builds and package a universal app.
 - [x] Add accessibility labels to critical unlock controls.
 
 ## P3 — distribution
 
 - [ ] Add Developer ID signing configuration.
 - [x] Add Developer ID signing and notarization scripts without embedded secrets.
+- [x] Add repeatable universal release verification command and manual QA matrix.
 - [ ] Test clean installation from DMG.
 - [ ] Test uninstall and complete local-data deletion.
 - [ ] Review all third-party licenses before release.

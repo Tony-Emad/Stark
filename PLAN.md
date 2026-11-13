@@ -23,7 +23,7 @@ Status: complete.
 
 ## Phase 1 — real face enrollment
 
-Status: in progress.
+Status: complete for the local MVP; production model audit remains a release gate.
 
 - Capture guided enrollment poses. (done in prototype)
 - Generate on-device Vision feature prints. (done in prototype)
@@ -34,11 +34,11 @@ Status: in progress.
 
 ## Phase 2 — matching and liveness
 
-Status: prototype implemented; validation planned.
+Status: complete for the local MVP; adversarial validation remains a release gate.
 
 - Separate face detection, identity matching, and liveness gates. (done in prototype)
 - Add rolling-window motion checks. (done in prototype)
-- Test lighting, glasses, beard changes, printed photos, and screen replay.
+- Test lighting, glasses, beard changes, printed photos, and screen replay. (manual QA matrix added)
 - Keep manual password recovery available at all times.
 
 ## Phase 3 — lock companion
@@ -47,7 +47,7 @@ Status: complete for the in-session MVP.
 
 - Add a non-spoofing in-session lock companion surface. (done)
 - Add manual lock, menu-bar controls, auto-lock, and Touch ID/password recovery. (done)
-- Observe supported sleep/wake and lock/unlock transitions.
+- Observe supported sleep/wake transitions and re-lock Stark's own session. (done)
 - Avoid impersonating Apple's system login window.
 
 ## Phase 4 — optional convenience bridge
@@ -60,9 +60,9 @@ public Touch ID/password prompt for recovery instead.
 
 ## Phase 5 — release
 
-Status: complete for local release automation.
+Status: complete for local release automation; Developer ID credentials remain external.
 
 - Add a production `.icns` icon. (done)
 - Configure Developer ID signing and notarization scripts. (done; credentials remain external)
-- Test Apple Silicon and Intel compatibility if both are supported.
+- Test Apple Silicon and Intel compatibility if both are supported. (cross-build and universal package verified)
 - Publish privacy, security, recovery, and uninstall documentation. (privacy and security done)

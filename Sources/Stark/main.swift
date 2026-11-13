@@ -109,6 +109,7 @@ final class StarkModel: NSObject, ObservableObject {
     private var currentInput: AVCaptureDeviceInput?
     private var currentOutput: AVCaptureVideoDataOutput?
     private var autoLockTask: Task<Void, Never>?
+    private var lockCompanionMonitor: LockCompanionMonitor?
 
     let poses = ["center", "top right", "right", "bottom right", "bottom", "bottom left", "left", "top left", "top"]
 
@@ -121,6 +122,9 @@ final class StarkModel: NSObject, ObservableObject {
         selectedCameraID = UserDefaults.standard.string(forKey: "stark.camera.id")
         launchAtLoginEnabled = SMAppService.mainApp.status == .enabled
         refreshCameras()
+        lockCompanionMonitor = LockCompanionMonitor { [weak self] in
+            self?.lockNow()
+        }
         if enrollmentSamples >= poses.count {
             setupStep = .ready
             detail = "Stark is secured on this Mac."

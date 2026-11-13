@@ -17,6 +17,7 @@ third-party source code or artwork is shipped by Stark.
 - Touch ID/password authorization through Apple's public LocalAuthentication API
 - User-provided Stark logo
 - DMG packaging script
+- Universal arm64 + x86_64 release bundle
 
 The prototype does not replace the macOS system login window and its camera
 matching is not equivalent to hardware-backed biometric security. See
@@ -27,6 +28,7 @@ matching is not equivalent to hardware-backed biometric security. See
 ```sh
 swift build
 ./scripts/build_dmg.sh
+./scripts/verify_release.sh
 ```
 
 The generated DMG is for local testing. Public distribution requires Developer
