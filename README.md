@@ -11,13 +11,16 @@ third-party source code or artwork is shipped by Stark.
 - Notch-first setup panel anchored to the top center of the display
 - Circular camera preview with segmented scan ring and head-position prompts
 - On-device Vision face-presence detection
+- Local Vision feature-print enrollment and conservative matching prototype
+- Rolling motion-based liveness signal
+- Keychain-backed local identity record with delete/reset control
 - Touch ID/password authorization through Apple's public LocalAuthentication API
 - User-provided Stark logo
 - DMG packaging script
 
-The prototype does not yet perform enrolled-person recognition or replace the
-macOS system login window. See `STARK_PROJECT.md` for the security boundary
-and roadmap.
+The prototype does not replace the macOS system login window and its camera
+matching is not equivalent to hardware-backed biometric security. See
+`STARK_PROJECT.md` for the security boundary and roadmap.
 
 ## Build
 

@@ -23,19 +23,21 @@ Status: complete.
 
 ## Phase 1 — real face enrollment
 
-Status: next.
+Status: in progress.
 
-- Capture guided enrollment poses.
-- Generate on-device face embeddings.
-- Encrypt embeddings with a Keychain-protected key.
-- Add identity deletion, re-enrollment, and consent screens.
+- Capture guided enrollment poses. (done in prototype)
+- Generate on-device Vision feature prints. (done in prototype)
+- Store the identity record in the macOS Keychain. (done in prototype)
+- Add identity deletion and reset controls. (done in prototype)
+- Replace the prototype feature print with a face-specific audited embedding model.
+- Add stronger consent, re-enrollment, and encrypted-at-rest review before release.
 
 ## Phase 2 — matching and liveness
 
-Status: planned.
+Status: prototype implemented; validation planned.
 
-- Separate face detection, identity matching, and liveness gates.
-- Add rolling-window motion and landmark checks.
+- Separate face detection, identity matching, and liveness gates. (done in prototype)
+- Add rolling-window motion checks. (done in prototype)
 - Test lighting, glasses, beard changes, printed photos, and screen replay.
 - Keep manual password recovery available at all times.
 

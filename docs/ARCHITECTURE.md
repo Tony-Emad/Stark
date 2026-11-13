@@ -6,7 +6,7 @@ Copyright: © 2026 Tony Emad. All rights reserved.
 ## Current modules
 
 `StarkModel` owns the prototype state, camera lifecycle, Vision face-presence
-request, setup steps, and LocalAuthentication prompt. `StarkNotchView` renders
+request, setup steps, identity store, and LocalAuthentication prompt. `StarkNotchView` renders
 the entire setup experience as a top-center panel with a circular preview,
 segmented ring, and head-position prompt. `StarkWindowController` turns the
 SwiftUI window into a borderless status-level panel and anchors it to the top
@@ -21,10 +21,9 @@ StarkApp
 ├── AppShell / menu bar / onboarding
 ├── CameraService
 ├── FaceDetector
-├── FaceEmbedder
+├── FaceRecognitionService (Vision feature print + liveness prototype)
 ├── FaceMatcher
-├── LivenessEngine
-├── IdentityStore
+├── IdentityStore / KeychainStore
 ├── CredentialVault
 ├── LocalAuthCoordinator
 ├── LockCompanion
@@ -39,7 +38,7 @@ fallback path.
 ## Data flow
 
 ```text
-Camera frame → Vision detection → alignment → embedding
+Camera frame → Vision detection → face crop → feature print
                                       ├→ identity match
                                       └→ liveness gate
 

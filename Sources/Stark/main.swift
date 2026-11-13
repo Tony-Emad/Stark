@@ -4,6 +4,8 @@ import LocalAuthentication
 import SwiftUI
 import Vision
 
+private let starkFaceRecognitionService = FaceRecognitionService()
+
 @main
 struct StarkApp: App {
     @NSApplicationDelegateAdaptor(StarkAppDelegate.self) private var appDelegate
@@ -21,7 +23,7 @@ struct StarkApp: App {
         .windowResizability(.contentSize)
 
         Settings {
-            StarkSettingsView()
+            StarkSettingsView(model: model)
         }
     }
 }
@@ -62,12 +64,23 @@ final class StarkModel: NSObject, ObservableObject {
     @Published var isRunning = false
     @Published var setupStep: StarkSetupStep = .faceScan
     @Published var poseIndex = 0
+    @Published var livenessScore: Double = 0
+    @Published var isLive = false
+    @Published var matchState: FaceMatchState = .notEnrolled
+    @Published var enrollmentSamples = 0
 
     let session = AVCaptureSession()
+    let identityStore = IdentityStore()
     private let cameraQueue = DispatchQueue(label: "com.stark.camera")
     private var isConfigured = false
+    private var latestFeaturePrintData: Data?
 
     let poses = ["center", "top right", "right", "bottom right", "bottom", "bottom left", "left", "top left", "top"]
+
+    override init() {
+        super.init()
+        enrollmentSamples = identityStore.sampleCount
+    }
 
     var currentInstruction: String {
         "Tilt your head to the \(poses[min(poseIndex, poses.count - 1)])"
@@ -78,10 +91,32 @@ final class StarkModel: NSObject, ObservableObject {
         return Double(poseIndex + 1) / Double(poses.count)
     }
 
+    var faceStatusText: String {
+        if phase == .faceFound && isLive { return "Live face found — capture this position" }
+        if phase == .faceFound { return "Move slightly to confirm liveness" }
+        if case .unavailable(let message) = phase { return message }
+        return "Keep your face inside the circle"
+    }
+
     func startSetup() {
         setupStep = .faceScan
         poseIndex = 0
+        enrollmentSamples = identityStore.sampleCount
         startCamera()
+    }
+
+    func resetEnrollment() {
+        do {
+            try identityStore.clear()
+            enrollmentSamples = 0
+            poseIndex = 0
+            setupStep = .faceScan
+            matchState = .notEnrolled
+            detail = "Face setup deleted from this Mac."
+            startCamera()
+        } catch {
+            detail = "Could not delete the saved face setup: \(error.localizedDescription)"
+        }
     }
 
     func advanceSetup() {
@@ -89,16 +124,33 @@ final class StarkModel: NSObject, ObservableObject {
         case .welcome:
             startSetup()
         case .faceScan:
-            if poseIndex + 1 < poses.count {
-                poseIndex += 1
-            } else {
-                setupStep = .secure
-                detail = "Secure Stark with Touch ID or your Mac password."
-            }
+            captureEnrollmentSample()
         case .secure:
             authorizeWithTouchIDOrPassword()
         case .ready:
             NSApp.hide(nil)
+        }
+    }
+
+    func captureEnrollmentSample() {
+        guard phase == .faceFound, isLive, let latestFeaturePrintData else {
+            detail = "Look at the camera and move slightly so Stark can verify a live face."
+            return
+        }
+
+        do {
+            try identityStore.add(featurePrint: latestFeaturePrintData)
+            enrollmentSamples = identityStore.sampleCount
+            if poseIndex + 1 < poses.count {
+                poseIndex += 1
+                detail = "Position captured. Continue with the next pose."
+            } else {
+                setupStep = .secure
+                stopCamera()
+                detail = "Secure Stark with Touch ID or your Mac password."
+            }
+        } catch {
+            detail = "Could not save this local face sample: \(error.localizedDescription)"
         }
     }
 
@@ -192,6 +244,7 @@ final class StarkModel: NSObject, ObservableObject {
 
         phase = .looking
         detail = "Face presence is detected on-device."
+        starkFaceRecognitionService.reset()
         isRunning = true
         let captureSession = session
         cameraQueue.async { [weak self] in
@@ -205,25 +258,34 @@ extension StarkModel: AVCaptureVideoDataOutputSampleBufferDelegate {
     nonisolated func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
-        let request = VNDetectFaceLandmarksRequest { [weak self] request, _ in
-            let face = (request.results as? [VNFaceObservation])?.first
-            let confidence = face?.confidence ?? 0
-            let hasFace = face != nil && confidence >= 0.5
-            Task { @MainActor in
-                guard let self else { return }
-                if hasFace {
-                    self.faceConfidence = confidence
-                    if self.phase != .authorized { self.phase = .faceFound }
-                } else if self.phase != .authorized {
-                    self.phase = .looking
-                    self.faceConfidence = 0
+        let result = starkFaceRecognitionService.process(pixelBuffer: pixelBuffer)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.faceConfidence = result.confidence
+            self.livenessScore = result.livenessScore
+            self.isLive = result.isLive
+            if let featurePrintData = result.featurePrintData {
+                self.latestFeaturePrintData = featurePrintData
+                if let enrolled = self.identityStore.firstFeaturePrint,
+                   let distance = FaceMatcher.distance(current: featurePrintData, enrolled: enrolled) {
+                    self.matchState = distance <= FaceMatcher.matchThreshold ? .matched(distance: distance) : .rejected(distance: distance)
+                } else {
+                    self.matchState = .notEnrolled
                 }
             }
-        }
 
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .up, options: [:])
-        try? handler.perform([request])
+            if result.hasFace {
+                if self.phase != .authorized { self.phase = .faceFound }
+            } else if self.phase != .authorized {
+                self.phase = .looking
+                self.faceConfidence = 0
+                self.livenessScore = 0
+                self.isLive = false
+                self.matchState = self.identityStore.sampleCount == 0 ? .notEnrolled : .searching
+            }
+        }
     }
+
 }
 
 struct StarkNotchView: View {
@@ -285,11 +347,11 @@ struct StarkNotchView: View {
                 Text(model.currentInstruction)
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white.opacity(0.92))
-                Text(model.phase == .faceFound ? "Face found — capture this position" : "Keep your face inside the circle")
+                Text(model.faceStatusText)
                     .font(.system(size: 11))
                     .foregroundStyle(.white.opacity(0.52))
                 primaryButton("Capture position", action: model.advanceSetup)
-                    .opacity(model.phase == .faceFound ? 1 : 0.55)
+                    .opacity(model.phase == .faceFound && model.isLive ? 1 : 0.55)
             }
         case .secure:
             VStack(spacing: 16) {
@@ -460,6 +522,8 @@ final class PreviewView: NSView {
 }
 
 struct StarkSettingsView: View {
+    @ObservedObject var model: StarkModel
+
     var body: some View {
         Form {
             Section("Security") {
@@ -469,6 +533,13 @@ struct StarkSettingsView: View {
             Section("Permissions") {
                 Text("Camera access is required for local face detection. Accessibility permission will only be needed for an explicitly opted-in password-entry bridge in a later phase.")
                     .fixedSize(horizontal: false, vertical: true)
+            }
+            Section("Local face setup") {
+                Text("Saved samples: \(model.enrollmentSamples)")
+                Button("Delete face setup") {
+                    model.resetEnrollment()
+                }
+                .foregroundStyle(.red)
             }
         }
         .padding()

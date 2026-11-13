@@ -14,19 +14,20 @@ Copyright: © 2026 Tony Emad. All rights reserved.
 - [x] Add DMG build script.
 - [x] Add proprietary LICENSE, NOTICE, and OWNERSHIP.md.
 - [x] Add project README, plan, architecture, security, and release docs.
+- [x] Add guided face-enrollment screens.
+- [x] Choose a local Vision feature-print implementation for the prototype.
+- [x] Implement Keychain-backed identity storage.
+- [x] Add explicit enrollment deletion and reset flows.
+- [x] Implement identity matching with a conservative prototype threshold.
+- [x] Implement liveness analysis as an independent motion gate.
 
 ## P0 — next build
 
-- [ ] Add guided face-enrollment screens.
-- [ ] Choose and audit an on-device embedding model.
-- [ ] Implement encrypted identity storage.
-- [ ] Add explicit enrollment deletion and reset flows.
+- [ ] Replace the prototype feature print with a face-specific audited embedding model.
 - [ ] Create unit tests for enrollment state and Keychain failure paths.
 
 ## P1 — security and reliability
 
-- [ ] Implement identity matching with conservative thresholds.
-- [ ] Implement liveness analysis as an independent gate.
 - [ ] Add replay/photo/screen spoof test fixtures.
 - [ ] Add camera selection and external-display behavior.
 - [ ] Add session expiry and automatic re-authorization.

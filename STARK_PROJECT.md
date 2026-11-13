@@ -30,6 +30,9 @@ The current prototype intentionally implements only the first part of this bound
 - Circular live camera preview, segmented progress ring, head-position prompts, and compact setup steps.
 - Camera permission flow and live camera preview.
 - On-device `VNDetectFaceLandmarksRequest` face-presence detection.
+- Local Vision feature-print enrollment and conservative match state.
+- Rolling motion-based liveness signal for the setup capture gate.
+- Keychain-backed identity storage with a delete/reset path.
 - Visible states: ready, requesting camera, looking, face detected, authorized, unavailable.
 - `LAContext` authorization using `deviceOwnerAuthentication`, which lets macOS use Touch ID and fall back to the account password.
 - User-provided Stark logo in the app UI and DMG bundle.
