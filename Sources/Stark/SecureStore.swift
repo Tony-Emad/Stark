@@ -33,17 +33,25 @@ final class KeychainStore {
     }
 
     func load(account: String) throws -> Data? {
-        let query: [CFString: Any] = [
+        let context = LAContext()
+        context.interactionNotAllowed = true
+        var query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,
             kSecAttrAccount: account,
             kSecReturnData: true,
             kSecMatchLimit: kSecMatchLimitOne
         ]
+        // Loading identity data at launch must never interrupt the user with
+        // a system Keychain dialog. Explicit authorization remains available
+        // through LocalAuthentication when Stark needs it.
+        query[kSecUseAuthenticationContext] = context
 
         var result: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
-        if status == errSecItemNotFound { return nil }
+        if status == errSecItemNotFound || status == errSecInteractionNotAllowed || status == errSecAuthFailed {
+            return nil
+        }
         guard status == errSecSuccess else { throw SecureStoreError.keychain(status) }
         return result as? Data
     }

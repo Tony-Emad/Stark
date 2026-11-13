@@ -22,6 +22,10 @@ Copyright: © 2026 Tony Emad. All rights reserved.
 - [x] Implement liveness analysis as an independent motion gate.
 - [x] Disable camera mirroring so the preview matches the user's natural view.
 - [x] Automatically capture each enrollment pose after a live face is stable.
+- [x] Resume incomplete enrollment at the next missing pose after reopening Stark.
+- [x] Keep Done and close controls scoped to the notch panel and restore it at the top center when reopened.
+- [x] Redesign Settings as readable cards instead of a cramped form.
+- [x] Prevent launch-time Keychain authentication dialogs from appearing over the desktop.
 - [x] Add in-session lock companion with manual recovery.
 - [x] Add menu-bar controls, camera selection, launch-at-login, and auto-lock.
 - [x] Re-lock Stark's own session around system sleep/wake notifications.
@@ -44,6 +48,7 @@ Copyright: © 2026 Tony Emad. All rights reserved.
 
 - [ ] Add notch/pill scan animation without copying reference artwork.
 - [ ] Add onboarding, settings, and permission recovery screens.
+- [x] Add a readable card-based Settings window.
 - [ ] Add menu-bar controls and launch-at-login preference.
 - [x] Add proper Stark `.icns` asset.
 - [x] Verify arm64 and x86_64 builds and package a universal app.

@@ -13,6 +13,7 @@ Copyright: © 2026 Tony Emad. All rights reserved.
 - [x] App bundle contains the Stark icon and resource bundle.
 - [x] Enrollment UI exposes automatic capture instead of a manual capture button.
 - [x] Camera preview uses zero-degree native camera orientation and explicitly disables video mirroring.
+- [x] App launch does not show an unsolicited Keychain authentication dialog.
 
 Run all automated checks with:
 
@@ -22,7 +23,9 @@ Run all automated checks with:
 
 ## Manual Mac checks
 
-- [ ] Launch the app on an Apple Silicon Mac and confirm the panel is anchored to the top center.
+- [x] Launch the app on this Apple Silicon Mac and confirm the panel is anchored to the top center.
+- [x] Confirm Done and X hide only the notch panel and reopening Stark restores it at the top center.
+- [x] Confirm the Settings window uses readable card sections without clipped text.
 - [ ] Launch the app on an Intel Mac and confirm the panel and camera preview work.
 - [ ] Deny camera permission and confirm Stark explains how to recover it.
 - [ ] Allow camera permission and confirm face presence updates the scan state.

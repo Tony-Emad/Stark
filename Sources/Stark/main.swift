@@ -15,7 +15,7 @@ struct StarkApp: App {
     var body: some Scene {
         WindowGroup("Stark") {
             StarkNotchView(model: model)
-                .frame(width: 380, height: 430)
+                .frame(width: 360, height: 350)
                 .background(NotchWindowConfigurator())
                 .onAppear { model.startCamera() }
                 .onDisappear { model.stopCamera() }
@@ -35,6 +35,7 @@ struct StarkApp: App {
             .disabled(model.identityStore.sampleCount == 0)
 
             Button("Open Stark setup") {
+                model.openSetup()
                 StarkWindowController.showPanel()
             }
 
@@ -59,6 +60,13 @@ final class StarkAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        DispatchQueue.main.async {
+            StarkWindowController.showPanel()
+        }
+        return true
     }
 }
 
@@ -142,6 +150,10 @@ final class StarkModel: NSObject, ObservableObject {
         return Double(poseIndex + 1) / Double(poses.count)
     }
 
+    var hasCompleteFaceSetup: Bool {
+        identityStore.sampleCount >= poses.count
+    }
+
     var faceStatusText: String {
         if phase == .faceFound && isLive && isAutoCapturing { return "Capturing automatically…" }
         if phase == .faceFound && isLive { return "Live face found — preparing capture" }
@@ -152,11 +164,22 @@ final class StarkModel: NSObject, ObservableObject {
 
     func startSetup() {
         setupStep = .faceScan
-        poseIndex = 0
+        poseIndex = min(identityStore.sampleCount, poses.count - 1)
         enrollmentSamples = identityStore.sampleCount
         latestFeaturePrintData = nil
         cancelAutoCapture()
         startCamera()
+    }
+
+    func openSetup() {
+        if hasCompleteFaceSetup {
+            setupStep = .ready
+            stopCamera()
+        } else {
+            setupStep = .faceScan
+            poseIndex = min(identityStore.sampleCount, poses.count - 1)
+            startCamera()
+        }
     }
 
     func resetEnrollment() {
@@ -256,7 +279,14 @@ final class StarkModel: NSObject, ObservableObject {
         case .secure:
             authorizeWithTouchIDOrPassword()
         case .ready:
-            NSApp.hide(nil)
+            if hasCompleteFaceSetup {
+                stopCamera()
+                StarkWindowController.hidePanel()
+            } else {
+                setupStep = .faceScan
+                poseIndex = min(identityStore.sampleCount, poses.count - 1)
+                startCamera()
+            }
         }
     }
 
@@ -489,14 +519,14 @@ struct StarkNotchView: View {
 
             VStack(spacing: 0) {
                 HStack {
-                    Text("STARK SETUP")
+                    Text("STARK")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .tracking(2.4)
                         .foregroundStyle(.white.opacity(0.74))
                     Spacer()
                     Button {
                         model.stopCamera()
-                        NSApp.hide(nil)
+                        StarkWindowController.hidePanel()
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 12, weight: .medium))
@@ -506,12 +536,12 @@ struct StarkNotchView: View {
                     .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 24)
-                .padding(.top, 17)
+                .padding(.top, 24)
 
-                Spacer(minLength: 8)
+                Spacer(minLength: 6)
                 content
-                Spacer(minLength: 12)
-                progressDots.padding(.bottom, 22)
+                Spacer(minLength: 8)
+                progressDots.padding(.bottom, 16)
             }
             .padding(.horizontal, 18)
         }
@@ -589,9 +619,10 @@ struct StarkNotchView: View {
     private var lockContent: some View {
         VStack(spacing: 14) {
             ZStack {
-                TickRing(progress: model.isLive ? 1 : model.livenessScore).frame(width: 220, height: 220)
+                TickRing(progress: model.isLive ? 1 : model.livenessScore, diameter: 174)
+                    .frame(width: 174, height: 174)
                 CameraPreview(session: model.session)
-                    .frame(width: 154, height: 154)
+                    .frame(width: 124, height: 124)
                     .clipShape(Circle())
                     .overlay(Circle().stroke(.white.opacity(0.18), lineWidth: 1))
             }
@@ -624,9 +655,10 @@ struct StarkNotchView: View {
 
     private var faceScanner: some View {
         ZStack {
-            TickRing(progress: model.setupProgress).frame(width: 220, height: 220)
+            TickRing(progress: model.setupProgress, diameter: 174)
+                .frame(width: 174, height: 174)
             CameraPreview(session: model.session)
-                .frame(width: 154, height: 154)
+                .frame(width: 124, height: 124)
                 .clipShape(Circle())
                 .overlay(Circle().stroke(.white.opacity(0.18), lineWidth: 1))
         }
@@ -659,6 +691,12 @@ struct StarkNotchView: View {
 
 struct TickRing: View {
     let progress: Double
+    let diameter: CGFloat
+
+    init(progress: Double, diameter: CGFloat = 220) {
+        self.progress = progress
+        self.diameter = diameter
+    }
 
     var body: some View {
         ZStack {
@@ -666,7 +704,7 @@ struct TickRing: View {
                 Capsule()
                     .fill(index < Int(progress * 48) ? Color.blue : Color.white.opacity(0.78))
                     .frame(width: 2.4, height: index % 4 == 0 ? 12 : 8)
-                    .offset(y: -96)
+                    .offset(y: -(diameter / 2 - 7))
                     .rotationEffect(.degrees(Double(index) * 7.5))
             }
         }
@@ -693,7 +731,9 @@ struct NotchWindowConfigurator: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         DispatchQueue.main.async {
-            if let window = view.window { StarkWindowController.configure(window) }
+            if let window = view.window {
+                StarkWindowController.configure(window)
+            }
         }
         return view
     }
@@ -705,20 +745,38 @@ struct NotchWindowConfigurator: NSViewRepresentable {
 
 @MainActor
 enum StarkWindowController {
-    static let panelSize = NSSize(width: 380, height: 430)
+    private static let panelIdentifier = NSUserInterfaceItemIdentifier("com.stark.notch-panel")
+    private static let panelSize = NSSize(width: 360, height: 350)
+    private static var isPanelHidden = false
 
     static func configureExistingWindow() {
-        if let window = NSApp.windows.first(where: { $0.contentView != nil }) { configure(window) }
+        if let window = panelWindow() { configure(window) }
     }
 
-    @MainActor
     static func showPanel() {
+        isPanelHidden = false
         configureExistingWindow()
         NSApp.activate(ignoringOtherApps: true)
-        NSApp.windows.first(where: { $0.contentView != nil })?.makeKeyAndOrderFront(nil)
+        if let window = panelWindow() {
+            window.setContentSize(panelSize)
+            position(window, size: panelSize)
+            window.makeKeyAndOrderFront(nil)
+        }
+    }
+
+    static func hidePanel() {
+        isPanelHidden = true
+        NSApp.hide(nil)
+        panelWindow()?.orderOut(nil)
+    }
+
+    private static func panelWindow() -> NSWindow? {
+        NSApp.windows.first(where: { $0.identifier == panelIdentifier })
+            ?? NSApp.windows.first(where: { $0.title == "Stark" })
     }
 
     static func configure(_ window: NSWindow) {
+        window.identifier = panelIdentifier
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.styleMask = [.borderless]
@@ -728,15 +786,20 @@ enum StarkWindowController {
         window.level = .statusBar
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         window.isMovableByWindowBackground = false
-        window.setContentSize(panelSize)
-        position(window)
-        window.orderFrontRegardless()
+        if window.frame.size != panelSize {
+            DispatchQueue.main.async {
+                guard !isPanelHidden else { return }
+                window.setContentSize(panelSize)
+                position(window, size: panelSize)
+            }
+        }
+        if !isPanelHidden { window.orderFrontRegardless() }
     }
 
-    private static func position(_ window: NSWindow) {
+    private static func position(_ window: NSWindow, size: NSSize) {
         guard let screen = NSScreen.main else { return }
-        let origin = CGPoint(x: screen.frame.midX - panelSize.width / 2, y: screen.frame.maxY - panelSize.height)
-        window.setFrame(NSRect(origin: origin, size: panelSize), display: true, animate: false)
+        let origin = CGPoint(x: screen.frame.midX - size.width / 2, y: screen.frame.maxY - size.height)
+        window.setFrame(NSRect(origin: origin, size: size), display: true, animate: false)
     }
 }
 
@@ -801,50 +864,100 @@ struct StarkSettingsView: View {
     @ObservedObject var model: StarkModel
 
     var body: some View {
-        Form {
-            Section("Security") {
-                Text("Stark uses Apple's public LocalAuthentication prompt for Touch ID or Mac password authorization. Face matching and system-login integration are separate future phases.")
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Section("Permissions") {
-                Text("Camera access is required for local face detection. Accessibility permission will only be needed for an explicitly opted-in password-entry bridge in a later phase.")
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Section("Camera") {
-                if model.cameras.isEmpty {
-                    Text("No camera detected")
-                        .foregroundStyle(.secondary)
-                } else {
-                    Picker("Camera", selection: Binding(
-                        get: { model.selectedCameraID ?? model.cameras[0].id },
-                        set: { model.selectCamera($0) }
-                    )) {
-                        ForEach(model.cameras) { camera in
-                            Text(camera.name).tag(camera.id)
-                        }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 12) {
+                    Image(systemName: "faceid")
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundStyle(.blue)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Stark Settings")
+                            .font(.title2.weight(.semibold))
+                        Text("Camera, security, and session controls")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
                 }
-                Button("Refresh cameras") { model.refreshCameras() }
-            }
-            Section("Session") {
-                Stepper(
-                    "Auto-lock after \(model.autoLockMinutes) minutes",
-                    value: Binding(
-                        get: { model.autoLockMinutes },
-                        set: { model.setAutoLockMinutes($0) }
-                    ),
-                    in: 1...60
-                )
-            }
-            Section("Local face setup") {
-                Text("Saved samples: \(model.enrollmentSamples)")
-                Button("Delete face setup") {
-                    model.resetEnrollment()
+
+                settingsCard(title: "Security", systemImage: "lock.shield") {
+                    Text("Stark uses Touch ID or your Mac password through Apple's LocalAuthentication prompt. Face matching stays local to this Mac.")
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .foregroundStyle(.red)
+
+                settingsCard(title: "Camera", systemImage: "camera") {
+                    if model.cameras.isEmpty {
+                        Text("No camera detected")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Picker("Camera", selection: Binding(
+                            get: { model.selectedCameraID ?? model.cameras[0].id },
+                            set: { model.selectCamera($0) }
+                        )) {
+                            ForEach(model.cameras) { camera in
+                                Text(camera.name).tag(camera.id)
+                            }
+                        }
+                    }
+                    Button("Refresh cameras") { model.refreshCameras() }
+                        .buttonStyle(.bordered)
+                }
+
+                settingsCard(title: "Session", systemImage: "timer") {
+                    HStack {
+                        Text("Auto-lock after")
+                        Spacer()
+                        Stepper(
+                            "\(model.autoLockMinutes) min",
+                            value: Binding(
+                                get: { model.autoLockMinutes },
+                                set: { model.setAutoLockMinutes($0) }
+                            ),
+                            in: 1...60
+                        )
+                        .labelsHidden()
+                        Text("\(model.autoLockMinutes) min")
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                            .frame(minWidth: 48, alignment: .trailing)
+                    }
+                }
+
+                settingsCard(title: "Local face setup", systemImage: "person.crop.circle") {
+                    HStack {
+                        Text("Saved samples")
+                        Spacer()
+                        Text("\(model.enrollmentSamples)")
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                    Button(role: .destructive) {
+                        model.resetEnrollment()
+                    } label: {
+                        Label("Delete face setup", systemImage: "trash")
+                    }
+                    .buttonStyle(.bordered)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(24)
         }
-        .padding()
-        .frame(width: 480, height: 280)
+        .frame(width: 560, height: 500)
+        .controlSize(.large)
+    }
+
+    private func settingsCard<Content: View>(
+        title: String,
+        systemImage: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(title, systemImage: systemImage)
+                .font(.headline)
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
