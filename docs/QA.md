@@ -12,7 +12,7 @@ Copyright: © 2026 Tony Emad. All rights reserved.
 - [x] App binary contains arm64 and x86_64.
 - [x] App bundle contains the Stark icon and resource bundle.
 - [x] Enrollment UI exposes automatic capture instead of a manual capture button.
-- [x] Camera preview explicitly disables video mirroring.
+- [x] Camera preview uses zero-degree native camera orientation and explicitly disables video mirroring.
 
 Run all automated checks with:
 
