@@ -11,6 +11,21 @@ struct FaceFrameResult: Sendable {
     let isLive: Bool
 }
 
+enum StarkLivenessPolicy {
+    static let minimumMotion: CGFloat = 0.035
+    static let normalizedMotion: CGFloat = 0.12
+    static let minimumWindowCoverage: CFTimeInterval = 0.65
+    static let minimumScore = Double(minimumMotion / normalizedMotion)
+
+    static func score(motion: CGFloat, windowCoverage: CFTimeInterval) -> Double {
+        min(1, Double(motion / normalizedMotion)) * min(1, windowCoverage / minimumWindowCoverage)
+    }
+
+    static func accepts(score: Double, windowCoverage: CFTimeInterval) -> Bool {
+        score >= 0.30 && windowCoverage >= minimumWindowCoverage
+    }
+}
+
 enum FaceMatchState: Equatable {
     case notEnrolled
     case searching
@@ -24,7 +39,6 @@ final class FaceRecognitionService: @unchecked Sendable {
     private var recentCenters: [(time: CFTimeInterval, point: CGPoint)] = []
     private var frameIndex = 0
     private let livenessWindow: CFTimeInterval = 2.0
-    private let motionThreshold = 0.035
 
     func reset() {
         recentCenters.removeAll()
@@ -46,8 +60,8 @@ final class FaceRecognitionService: @unchecked Sendable {
 
         let motion = totalMotion()
         let windowCoverage = recentCenters.last.map { _ in timestamp - recentCenters.first!.time } ?? 0
-        let livenessScore = min(1, motion / 0.12) * min(1, windowCoverage / 0.65)
-        let isLive = livenessScore >= motionThreshold / 0.12 && windowCoverage >= 0.65
+        let livenessScore = StarkLivenessPolicy.score(motion: motion, windowCoverage: windowCoverage)
+        let isLive = StarkLivenessPolicy.accepts(score: livenessScore, windowCoverage: windowCoverage)
 
         frameIndex += 1
         let printData = frameIndex % 6 == 0

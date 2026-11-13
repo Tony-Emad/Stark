@@ -34,31 +34,43 @@ Copyright: © 2026 Tony Emad. All rights reserved.
 ## P0 — next build
 
 - [ ] Replace the prototype feature print with a face-specific audited embedding model.
-- [ ] Create unit tests for enrollment state and Keychain failure paths.
+- [x] Add policy, session-boundary, and identity serialization unit tests.
+- [ ] Exercise Keychain failure paths on a clean test account.
 
 ## P1 — security and reliability
 
-- [ ] Add replay/photo/screen spoof test fixtures.
-- [ ] Add camera selection and external-display behavior.
-- [ ] Add session expiry and automatic re-authorization.
+- [ ] Add replay/photo/screen spoof test fixtures and record results on real hardware.
+- [ ] Validate camera selection and external-display behavior on supported Macs.
+- [x] Add session expiry and automatic re-authorization through configurable auto-lock.
 - [x] Add configurable auto-lock and Touch ID/password re-authorization.
-- [ ] Document threat model and recovery behavior.
+- [x] Document threat model and recovery behavior.
 
 ## P2 — product polish
 
 - [ ] Add notch/pill scan animation without copying reference artwork.
-- [ ] Add onboarding, settings, and permission recovery screens.
+- [x] Add onboarding, settings, and camera permission recovery.
 - [x] Add a readable card-based Settings window.
-- [ ] Add menu-bar controls and launch-at-login preference.
+- [x] Add menu-bar controls and launch-at-login preference.
 - [x] Add proper Stark `.icns` asset.
 - [x] Verify arm64 and x86_64 builds and package a universal app.
 - [x] Add accessibility labels to critical unlock controls.
 
 ## P3 — distribution
 
-- [ ] Add Developer ID signing configuration.
+- [ ] Configure a Developer ID identity and notarization profile on the release Mac.
 - [x] Add Developer ID signing and notarization scripts without embedded secrets.
 - [x] Add repeatable universal release verification command and manual QA matrix.
 - [ ] Test clean installation from DMG.
-- [ ] Test uninstall and complete local-data deletion.
-- [ ] Review all third-party licenses before release.
+- [x] Add a read-only DMG contents verifier.
+- [x] Add an explicit uninstall and complete local-data deletion script.
+- [x] Record third-party dependency and license status.
+
+## External release gates
+
+These cannot be completed honestly from this Apple Silicon development
+environment without the required hardware, credentials, or independent review:
+
+- [ ] Audit and integrate a face-specific biometric embedding model.
+- [ ] Run spoof/adversarial tests on real cameras, including an Intel Mac.
+- [ ] Configure the owner's Developer ID certificate and notarization profile.
+- [ ] Perform a clean install and signed public-release smoke test.

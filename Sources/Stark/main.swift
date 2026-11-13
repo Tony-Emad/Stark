@@ -20,7 +20,7 @@ struct StarkApp: App {
     var body: some Scene {
         WindowGroup("Stark") {
             StarkNotchView(model: model)
-                .frame(width: 360, height: 350)
+                .frame(width: 360, height: 330)
                 .background(NotchWindowConfigurator())
                 .onAppear {
                     if model.shouldShowPanel {
@@ -108,6 +108,15 @@ enum StarkSetupStep: Int, CaseIterable {
 struct CameraChoice: Identifiable, Hashable {
     let id: String
     let name: String
+}
+
+enum StarkSessionPolicy {
+    static let minimumAutoLockMinutes = 1
+    static let maximumAutoLockMinutes = 60
+
+    static func clampAutoLockMinutes(_ minutes: Int) -> Int {
+        min(max(minutes, minimumAutoLockMinutes), maximumAutoLockMinutes)
+    }
 }
 
 @MainActor
@@ -223,6 +232,18 @@ final class StarkModel: NSObject, ObservableObject {
         StarkWindowController.hidePanel()
     }
 
+    func openCameraSettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera") else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    var cameraPermissionNeedsRecovery: Bool {
+        if case .unavailable(let message) = phase {
+            return message.localizedCaseInsensitiveContains("camera access")
+        }
+        return false
+    }
+
     func resetEnrollment() {
         do {
             try identityStore.clear()
@@ -278,7 +299,7 @@ final class StarkModel: NSObject, ObservableObject {
     }
 
     func setAutoLockMinutes(_ minutes: Int) {
-        autoLockMinutes = min(max(minutes, 1), 60)
+        autoLockMinutes = StarkSessionPolicy.clampAutoLockMinutes(minutes)
         UserDefaults.standard.set(autoLockMinutes, forKey: "stark.auto-lock-minutes")
         if !isLocked { armAutoLock() }
     }
@@ -410,7 +431,7 @@ final class StarkModel: NSObject, ObservableObject {
     func stopCamera() {
         guard isRunning else { return }
         let captureSession = session
-        cameraQueue.async { [weak self] in
+        cameraQueue.sync { [weak self] in
             captureSession.stopRunning()
             _ = self
         }
@@ -597,7 +618,7 @@ struct StarkNotchView: View {
                 Color.clear
             }
         }
-        .frame(width: 360, height: 350)
+        .frame(width: 360, height: 330)
         .preferredColorScheme(.dark)
     }
 
@@ -632,6 +653,13 @@ struct StarkNotchView: View {
                 Text(model.faceStatusText)
                     .font(.system(size: 11))
                     .foregroundStyle(.white.opacity(0.52))
+                if model.cameraPermissionNeedsRecovery {
+                    Button("Open Camera Settings") {
+                        model.openCameraSettings()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
                 Text(model.isAutoCapturing ? "AUTO CAPTURE ARMED" : "AUTO CAPTURE WHEN LIVE")
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .tracking(1.1)
@@ -676,10 +704,6 @@ struct StarkNotchView: View {
                     .frame(width: 174, height: 174)
                 CameraPreview(session: model.session)
                     .frame(width: 124, height: 124)
-                    // Some Mac camera drivers keep the front-camera mirror
-                    // in the preview layer even when the connection reports
-                    // mirroring disabled. Correct the presentation explicitly.
-                    .scaleEffect(x: -1, y: 1)
                     .clipShape(Circle())
                     .overlay(Circle().stroke(.white.opacity(0.18), lineWidth: 1))
             }
@@ -716,7 +740,6 @@ struct StarkNotchView: View {
                 .frame(width: 174, height: 174)
             CameraPreview(session: model.session)
                 .frame(width: 124, height: 124)
-                .scaleEffect(x: -1, y: 1)
                 .clipShape(Circle())
                 .overlay(Circle().stroke(.white.opacity(0.18), lineWidth: 1))
         }
@@ -804,7 +827,7 @@ struct NotchWindowConfigurator: NSViewRepresentable {
 @MainActor
 enum StarkWindowController {
     private static let panelIdentifier = NSUserInterfaceItemIdentifier("com.stark.notch-panel")
-    private static let panelSize = NSSize(width: 360, height: 350)
+    private static let panelSize = NSSize(width: 360, height: 330)
     private static var isPanelHidden = false
 
     static func configureExistingWindow() {
@@ -828,9 +851,19 @@ enum StarkWindowController {
     }
 
     static func reopenFromDock() {
-        guard !settingsWindowIsVisible,
-              !UserDefaults.standard.bool(forKey: starkSetupDismissedKey) else { return }
+        guard !settingsWindowIsVisible else { return }
+        if UserDefaults.standard.bool(forKey: starkSetupDismissedKey) {
+            hidePanel()
+            showSettings()
+            return
+        }
         showPanel()
+    }
+
+    static func showSettings() {
+        hidePanel()
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
     }
 
     static func hidePanel() {
@@ -995,6 +1028,8 @@ struct StarkSettingsView: View {
                     if model.cameras.isEmpty {
                         Text("No camera detected")
                             .foregroundStyle(.secondary)
+                        Button("Open Camera Settings") { model.openCameraSettings() }
+                            .buttonStyle(.bordered)
                     } else {
                         Picker("Camera", selection: Binding(
                             get: { model.selectedCameraID ?? model.cameras[0].id },
@@ -1007,6 +1042,10 @@ struct StarkSettingsView: View {
                     }
                     Button("Refresh cameras") { model.refreshCameras() }
                         .buttonStyle(.bordered)
+                    if model.cameraPermissionNeedsRecovery {
+                        Button("Open Camera Settings") { model.openCameraSettings() }
+                            .buttonStyle(.bordered)
+                    }
                 }
 
                 settingsCard(title: "Session", systemImage: "timer") {

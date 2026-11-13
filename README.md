@@ -29,10 +29,17 @@ matching is not equivalent to hardware-backed biometric security. See
 swift build
 ./scripts/build_dmg.sh
 ./scripts/verify_release.sh
+# Full local smoke check, including a read-only DMG inspection
+./scripts/qa_smoke.sh
 ```
 
 The generated DMG is for local testing. Public distribution requires Developer
 ID signing and notarization.
+
+To inspect whether the local signing environment is ready without exposing
+credentials, run `./scripts/check_signing_environment.sh`. To remove a local
+installation and its saved identity, use the deliberately explicit command
+`./scripts/uninstall_stark.sh --purge`.
 
 For a signed release, set `STARK_SIGNING_IDENTITY` before building, then set
 `STARK_NOTARY_PROFILE` to an existing `notarytool` keychain profile and run
@@ -41,4 +48,6 @@ For a signed release, set `STARK_SIGNING_IDENTITY` before building, then set
 ## Ownership
 
 Copyright © 2026 Tony Emad. All rights reserved. See `LICENSE`, `NOTICE`, and
-`OWNERSHIP.md`.
+`OWNERSHIP.md`. Third-party framework and asset status is recorded in
+`THIRD_PARTY_NOTICES.md`. Public-repository ownership and branch protection
+are documented in `docs/REPOSITORY_SECURITY.md`.
