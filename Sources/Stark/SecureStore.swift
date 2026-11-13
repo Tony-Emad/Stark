@@ -80,6 +80,7 @@ final class IdentityStore: ObservableObject {
 
     var sampleCount: Int { identity?.featurePrints.count ?? 0 }
     var firstFeaturePrint: Data? { identity?.featurePrints.first }
+    var featurePrints: [Data] { identity?.featurePrints ?? [] }
 
     func add(featurePrint: Data) throws {
         if var identity {

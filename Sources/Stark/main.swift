@@ -70,7 +70,7 @@ final class StarkModel: NSObject, ObservableObject {
     @Published var enrollmentSamples = 0
 
     let session = AVCaptureSession()
-    let identityStore = IdentityStore()
+    let identityStore: IdentityStore
     private let cameraQueue = DispatchQueue(label: "com.stark.camera")
     private var isConfigured = false
     private var latestFeaturePrintData: Data?
@@ -78,8 +78,13 @@ final class StarkModel: NSObject, ObservableObject {
     let poses = ["center", "top right", "right", "bottom right", "bottom", "bottom left", "left", "top left", "top"]
 
     override init() {
+        identityStore = IdentityStore()
         super.init()
         enrollmentSamples = identityStore.sampleCount
+        if enrollmentSamples >= poses.count {
+            setupStep = .ready
+            detail = "Stark is secured on this Mac."
+        }
     }
 
     var currentInstruction: String {
@@ -266,8 +271,10 @@ extension StarkModel: AVCaptureVideoDataOutputSampleBufferDelegate {
             self.isLive = result.isLive
             if let featurePrintData = result.featurePrintData {
                 self.latestFeaturePrintData = featurePrintData
-                if let enrolled = self.identityStore.firstFeaturePrint,
-                   let distance = FaceMatcher.distance(current: featurePrintData, enrolled: enrolled) {
+                let distances = self.identityStore.featurePrints.compactMap {
+                    FaceMatcher.distance(current: featurePrintData, enrolled: $0)
+                }
+                if let distance = distances.min() {
                     self.matchState = distance <= FaceMatcher.matchThreshold ? .matched(distance: distance) : .rejected(distance: distance)
                 } else {
                     self.matchState = .notEnrolled

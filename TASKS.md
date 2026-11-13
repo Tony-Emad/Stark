@@ -38,7 +38,7 @@ Copyright: © 2026 Tony Emad. All rights reserved.
 - [ ] Add notch/pill scan animation without copying reference artwork.
 - [ ] Add onboarding, settings, and permission recovery screens.
 - [ ] Add menu-bar controls and launch-at-login preference.
-- [ ] Add proper Stark `.icns` asset.
+- [x] Add proper Stark `.icns` asset.
 - [ ] Add accessibility labels and keyboard navigation.
 
 ## P3 — distribution
