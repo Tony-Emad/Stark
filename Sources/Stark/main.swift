@@ -6,6 +6,11 @@ import SwiftUI
 import Vision
 
 private let starkFaceRecognitionService = FaceRecognitionService()
+private let starkSetupDismissedKey = "stark.setup-dismissed"
+
+extension Notification.Name {
+    static let starkPanelShowRequested = Notification.Name("stark.panel-show-requested")
+}
 
 @main
 struct StarkApp: App {
@@ -17,7 +22,21 @@ struct StarkApp: App {
             StarkNotchView(model: model)
                 .frame(width: 360, height: 350)
                 .background(NotchWindowConfigurator())
-                .onAppear { model.startCamera() }
+                .onAppear {
+                    if model.shouldShowPanel {
+                        model.panelVisible = true
+                        model.startCamera()
+                    } else {
+                        model.panelVisible = false
+                        DispatchQueue.main.async {
+                            StarkWindowController.hidePanel()
+                        }
+                    }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .starkPanelShowRequested)) { _ in
+                    model.panelVisible = true
+                    model.startCamera()
+                }
                 .onDisappear { model.stopCamera() }
         }
         .windowStyle(.hiddenTitleBar)
@@ -64,7 +83,7 @@ final class StarkAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         DispatchQueue.main.async {
-            StarkWindowController.showPanel()
+            StarkWindowController.reopenFromDock()
         }
         return true
     }
@@ -102,6 +121,7 @@ final class StarkModel: NSObject, ObservableObject {
     @Published var livenessScore: Double = 0
     @Published var isLive = false
     @Published var isAutoCapturing = false
+    @Published var panelVisible = true
     @Published var matchState: FaceMatchState = .notEnrolled
     @Published var enrollmentSamples = 0
     @Published var isLocked = false
@@ -129,6 +149,7 @@ final class StarkModel: NSObject, ObservableObject {
         autoLockMinutes = max(1, storedAutoLockMinutes == 0 ? 5 : storedAutoLockMinutes)
         super.init()
         enrollmentSamples = identityStore.sampleCount
+        panelVisible = shouldShowPanel
         selectedCameraID = UserDefaults.standard.string(forKey: "stark.camera.id")
         launchAtLoginEnabled = SMAppService.mainApp.status == .enabled
         refreshCameras()
@@ -154,6 +175,14 @@ final class StarkModel: NSObject, ObservableObject {
         identityStore.sampleCount >= poses.count
     }
 
+    var hasDismissedSetup: Bool {
+        UserDefaults.standard.bool(forKey: starkSetupDismissedKey)
+    }
+
+    var shouldShowPanel: Bool {
+        !hasCompleteFaceSetup || !hasDismissedSetup
+    }
+
     var faceStatusText: String {
         if phase == .faceFound && isLive && isAutoCapturing { return "Capturing automatically…" }
         if phase == .faceFound && isLive { return "Live face found — preparing capture" }
@@ -163,6 +192,7 @@ final class StarkModel: NSObject, ObservableObject {
     }
 
     func startSetup() {
+        panelVisible = true
         setupStep = .faceScan
         poseIndex = min(identityStore.sampleCount, poses.count - 1)
         enrollmentSamples = identityStore.sampleCount
@@ -172,6 +202,8 @@ final class StarkModel: NSObject, ObservableObject {
     }
 
     func openSetup() {
+        UserDefaults.standard.set(false, forKey: starkSetupDismissedKey)
+        panelVisible = true
         if hasCompleteFaceSetup {
             setupStep = .ready
             stopCamera()
@@ -182,11 +214,22 @@ final class StarkModel: NSObject, ObservableObject {
         }
     }
 
+    func closePanel(permanently: Bool = false) {
+        if permanently && hasCompleteFaceSetup {
+            UserDefaults.standard.set(true, forKey: starkSetupDismissedKey)
+        }
+        panelVisible = false
+        stopCamera()
+        StarkWindowController.hidePanel()
+    }
+
     func resetEnrollment() {
         do {
             try identityStore.clear()
+            UserDefaults.standard.set(false, forKey: starkSetupDismissedKey)
             enrollmentSamples = 0
             poseIndex = 0
+            panelVisible = true
             setupStep = .faceScan
             isLocked = false
             latestFeaturePrintData = nil
@@ -200,6 +243,7 @@ final class StarkModel: NSObject, ObservableObject {
     }
 
     func lockNow() {
+        panelVisible = true
         guard identityStore.sampleCount > 0 else {
             detail = "Complete face setup before locking Stark."
             return
@@ -280,8 +324,7 @@ final class StarkModel: NSObject, ObservableObject {
             authorizeWithTouchIDOrPassword()
         case .ready:
             if hasCompleteFaceSetup {
-                stopCamera()
-                StarkWindowController.hidePanel()
+                closePanel(permanently: true)
             } else {
                 setupStep = .faceScan
                 poseIndex = min(identityStore.sampleCount, poses.count - 1)
@@ -512,39 +555,45 @@ struct StarkNotchView: View {
     @ObservedObject var model: StarkModel
 
     var body: some View {
-        ZStack {
-            NotchPanelShape()
-                .fill(Color.black)
-                .shadow(color: .black.opacity(0.4), radius: 24, y: 12)
+        Group {
+            if model.panelVisible {
+                ZStack {
+                    NotchPanelShape()
+                        .fill(Color.black)
+                        .shadow(color: .black.opacity(0.4), radius: 24, y: 12)
 
-            VStack(spacing: 0) {
-                HStack {
-                    Text("STARK")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .tracking(2.4)
-                        .foregroundStyle(.white.opacity(0.74))
-                    Spacer()
-                    Button {
-                        model.stopCamera()
-                        StarkWindowController.hidePanel()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.7))
-                            .frame(width: 26, height: 26)
+                    VStack(spacing: 0) {
+                        HStack {
+                            Text("STARK")
+                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .tracking(2.4)
+                                .foregroundStyle(.white.opacity(0.74))
+                            Spacer()
+                            Button {
+                                model.closePanel()
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(.white.opacity(0.7))
+                                    .frame(width: 26, height: 26)
+                            }
+                            .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
-                }
-                .padding(.horizontal, 24)
-                .padding(.top, 24)
+                        .padding(.horizontal, 24)
+                        .padding(.top, 24)
 
-                Spacer(minLength: 6)
-                content
-                Spacer(minLength: 8)
-                progressDots.padding(.bottom, 16)
+                        Spacer(minLength: 6)
+                        content
+                        Spacer(minLength: 8)
+                        progressDots.padding(.bottom, 16)
+                    }
+                    .padding(.horizontal, 18)
+                }
+            } else {
+                Color.clear
             }
-            .padding(.horizontal, 18)
         }
+        .frame(width: 360, height: 350)
         .preferredColorScheme(.dark)
     }
 
@@ -755,19 +804,36 @@ enum StarkWindowController {
 
     static func showPanel() {
         isPanelHidden = false
+        NotificationCenter.default.post(name: .starkPanelShowRequested, object: nil)
         configureExistingWindow()
         NSApp.activate(ignoringOtherApps: true)
         if let window = panelWindow() {
+            window.alphaValue = 1
+            window.ignoresMouseEvents = false
             window.setContentSize(panelSize)
             position(window, size: panelSize)
             window.makeKeyAndOrderFront(nil)
         }
     }
 
+    static func reopenFromDock() {
+        guard !settingsWindowIsVisible,
+              !UserDefaults.standard.bool(forKey: starkSetupDismissedKey) else { return }
+        showPanel()
+    }
+
     static func hidePanel() {
         isPanelHidden = true
-        NSApp.hide(nil)
-        panelWindow()?.orderOut(nil)
+        guard let window = panelWindow() else { return }
+        window.ignoresMouseEvents = true
+        window.alphaValue = 0
+        window.orderOut(nil)
+    }
+
+    private static var settingsWindowIsVisible: Bool {
+        NSApp.windows.contains {
+            ($0.identifier?.rawValue == "com_apple_SwiftUI_Settings_window" || $0.title == "Stark Settings") && $0.isVisible
+        }
     }
 
     private static func panelWindow() -> NSWindow? {

@@ -23,7 +23,7 @@ Copyright: © 2026 Tony Emad. All rights reserved.
 - [x] Disable camera mirroring so the preview matches the user's natural view.
 - [x] Automatically capture each enrollment pose after a live face is stable.
 - [x] Resume incomplete enrollment at the next missing pose after reopening Stark.
-- [x] Keep Done and close controls scoped to the notch panel and restore it at the top center when reopened.
+- [x] Keep Done and close controls scoped to the notch panel; persist completed setup dismissal and restore setup only on explicit request.
 - [x] Redesign Settings as readable cards instead of a cramped form.
 - [x] Prevent launch-time Keychain authentication dialogs from appearing over the desktop.
 - [x] Add in-session lock companion with manual recovery.

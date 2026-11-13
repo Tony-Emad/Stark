@@ -24,7 +24,8 @@ Run all automated checks with:
 ## Manual Mac checks
 
 - [x] Launch the app on this Apple Silicon Mac and confirm the panel is anchored to the top center.
-- [x] Confirm Done and X hide only the notch panel and reopening Stark restores it at the top center.
+- [x] Confirm Done permanently dismisses completed setup, X hides it temporarily, and Settings remains independent.
+- [x] Confirm explicit Open Stark setup restores the panel at the top center.
 - [x] Confirm the Settings window uses readable card sections without clipped text.
 - [ ] Launch the app on an Intel Mac and confirm the panel and camera preview work.
 - [ ] Deny camera permission and confirm Stark explains how to recover it.

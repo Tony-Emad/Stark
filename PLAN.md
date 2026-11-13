@@ -49,6 +49,7 @@ Status: complete for the in-session MVP.
 
 - Add a non-spoofing in-session lock companion surface. (done)
 - Add manual lock, menu-bar controls, auto-lock, and Touch ID/password recovery. (done)
+- Keep the completed setup panel dismissed after Done; reopen it only from the explicit setup command. (done)
 - Observe supported sleep/wake transitions and re-lock Stark's own session. (done)
 - Avoid impersonating Apple's system login window.
 
