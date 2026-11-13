@@ -26,6 +26,7 @@ Status: complete.
 Status: complete for the local MVP; production model audit remains a release gate.
 
 - Capture guided enrollment poses. (done in prototype)
+- Capture each pose automatically after a stable live-face confirmation. (done)
 - Generate on-device Vision feature prints. (done in prototype)
 - Store the identity record in the macOS Keychain. (done in prototype)
 - Add identity deletion and reset controls. (done in prototype)
@@ -38,6 +39,7 @@ Status: complete for the local MVP; adversarial validation remains a release gat
 
 - Separate face detection, identity matching, and liveness gates. (done in prototype)
 - Add rolling-window motion checks. (done in prototype)
+- Keep the camera preview non-mirrored so movement instructions are unambiguous. (done)
 - Test lighting, glasses, beard changes, printed photos, and screen replay. (manual QA matrix added)
 - Keep manual password recovery available at all times.
 

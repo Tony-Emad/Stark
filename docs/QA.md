@@ -11,6 +11,8 @@ Copyright: © 2026 Tony Emad. All rights reserved.
 - [x] App bundle passes ad-hoc code-sign verification.
 - [x] App binary contains arm64 and x86_64.
 - [x] App bundle contains the Stark icon and resource bundle.
+- [x] Enrollment UI exposes automatic capture instead of a manual capture button.
+- [x] Camera preview explicitly disables video mirroring.
 
 Run all automated checks with:
 
@@ -24,7 +26,7 @@ Run all automated checks with:
 - [ ] Launch the app on an Intel Mac and confirm the panel and camera preview work.
 - [ ] Deny camera permission and confirm Stark explains how to recover it.
 - [ ] Allow camera permission and confirm face presence updates the scan state.
-- [ ] Capture all guided poses and confirm samples persist after relaunch.
+- [ ] Capture all guided poses automatically and confirm samples persist after relaunch.
 - [ ] Confirm a saved setup can be deleted from Settings.
 - [ ] Confirm Touch ID/password authorization succeeds and cancellation is recoverable.
 - [ ] Confirm manual Lock Stark and auto-lock both require fresh authorization.

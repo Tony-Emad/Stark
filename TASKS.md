@@ -20,6 +20,8 @@ Copyright: © 2026 Tony Emad. All rights reserved.
 - [x] Add explicit enrollment deletion and reset flows.
 - [x] Implement identity matching with a conservative prototype threshold.
 - [x] Implement liveness analysis as an independent motion gate.
+- [x] Disable camera mirroring so the preview matches the user's natural view.
+- [x] Automatically capture each enrollment pose after a live face is stable.
 - [x] Add in-session lock companion with manual recovery.
 - [x] Add menu-bar controls, camera selection, launch-at-login, and auto-lock.
 - [x] Re-lock Stark's own session around system sleep/wake notifications.

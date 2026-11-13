@@ -93,6 +93,7 @@ final class StarkModel: NSObject, ObservableObject {
     @Published var poseIndex = 0
     @Published var livenessScore: Double = 0
     @Published var isLive = false
+    @Published var isAutoCapturing = false
     @Published var matchState: FaceMatchState = .notEnrolled
     @Published var enrollmentSamples = 0
     @Published var isLocked = false
@@ -109,6 +110,7 @@ final class StarkModel: NSObject, ObservableObject {
     private var currentInput: AVCaptureDeviceInput?
     private var currentOutput: AVCaptureVideoDataOutput?
     private var autoLockTask: Task<Void, Never>?
+    private var autoCaptureTask: Task<Void, Never>?
     private var lockCompanionMonitor: LockCompanionMonitor?
 
     let poses = ["center", "top right", "right", "bottom right", "bottom", "bottom left", "left", "top left", "top"]
@@ -141,7 +143,8 @@ final class StarkModel: NSObject, ObservableObject {
     }
 
     var faceStatusText: String {
-        if phase == .faceFound && isLive { return "Live face found — capture this position" }
+        if phase == .faceFound && isLive && isAutoCapturing { return "Capturing automatically…" }
+        if phase == .faceFound && isLive { return "Live face found — preparing capture" }
         if phase == .faceFound { return "Move slightly to confirm liveness" }
         if case .unavailable(let message) = phase { return message }
         return "Keep your face inside the circle"
@@ -151,6 +154,8 @@ final class StarkModel: NSObject, ObservableObject {
         setupStep = .faceScan
         poseIndex = 0
         enrollmentSamples = identityStore.sampleCount
+        latestFeaturePrintData = nil
+        cancelAutoCapture()
         startCamera()
     }
 
@@ -161,6 +166,8 @@ final class StarkModel: NSObject, ObservableObject {
             poseIndex = 0
             setupStep = .faceScan
             isLocked = false
+            latestFeaturePrintData = nil
+            cancelAutoCapture()
             matchState = .notEnrolled
             detail = "Face setup deleted from this Mac."
             startCamera()
@@ -254,14 +261,17 @@ final class StarkModel: NSObject, ObservableObject {
     }
 
     func captureEnrollmentSample() {
-        guard phase == .faceFound, isLive, let latestFeaturePrintData else {
+        guard phase == .faceFound, isLive, let featurePrintData = latestFeaturePrintData else {
             detail = "Look at the camera and move slightly so Stark can verify a live face."
             return
         }
 
         do {
-            try identityStore.add(featurePrint: latestFeaturePrintData)
+            try identityStore.add(featurePrint: featurePrintData)
             enrollmentSamples = identityStore.sampleCount
+            latestFeaturePrintData = nil
+            isLive = false
+            livenessScore = 0
             if poseIndex + 1 < poses.count {
                 poseIndex += 1
                 detail = "Position captured. Continue with the next pose."
@@ -273,6 +283,30 @@ final class StarkModel: NSObject, ObservableObject {
         } catch {
             detail = "Could not save this local face sample: \(error.localizedDescription)"
         }
+    }
+
+    private func scheduleAutoCaptureIfReady() {
+        guard setupStep == .faceScan, phase == .faceFound, isLive, autoCaptureTask == nil else { return }
+        let poseBeingCaptured = poseIndex
+        isAutoCapturing = true
+        autoCaptureTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 850_000_000)
+            guard !Task.isCancelled else { return }
+            self?.completeAutoCapture(for: poseBeingCaptured)
+        }
+    }
+
+    private func completeAutoCapture(for pose: Int) {
+        autoCaptureTask = nil
+        isAutoCapturing = false
+        guard pose == poseIndex, setupStep == .faceScan, phase == .faceFound, isLive else { return }
+        captureEnrollmentSample()
+    }
+
+    private func cancelAutoCapture() {
+        autoCaptureTask?.cancel()
+        autoCaptureTask = nil
+        isAutoCapturing = false
     }
 
     func startCamera() {
@@ -423,7 +457,13 @@ extension StarkModel: AVCaptureVideoDataOutputSampleBufferDelegate {
 
             if result.hasFace {
                 if self.phase != .authorized { self.phase = .faceFound }
+                if result.isLive && self.setupStep == .faceScan && !self.isLocked {
+                    self.scheduleAutoCaptureIfReady()
+                } else if !result.isLive {
+                    self.cancelAutoCapture()
+                }
             } else if self.phase != .authorized {
+                self.cancelAutoCapture()
                 self.phase = .looking
                 self.faceConfidence = 0
                 self.livenessScore = 0
@@ -506,8 +546,14 @@ struct StarkNotchView: View {
                 Text(model.faceStatusText)
                     .font(.system(size: 11))
                     .foregroundStyle(.white.opacity(0.52))
-                primaryButton("Capture position", action: model.advanceSetup)
-                    .opacity(model.phase == .faceFound && model.isLive ? 1 : 0.55)
+                Text(model.isAutoCapturing ? "AUTO CAPTURE ARMED" : "AUTO CAPTURE WHEN LIVE")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .tracking(1.1)
+                    .foregroundStyle(model.isAutoCapturing ? .blue : .white.opacity(0.5))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 11)
+                    .background(.white.opacity(0.08), in: Capsule())
+                    .accessibilityLabel("Automatic capture is enabled")
             }
         case .secure:
             VStack(spacing: 16) {
@@ -698,11 +744,13 @@ struct CameraPreview: NSViewRepresentable {
         let view = PreviewView()
         view.previewLayer.session = session
         view.previewLayer.videoGravity = .resizeAspectFill
+        view.updateMirroring()
         return view
     }
 
     func updateNSView(_ nsView: PreviewView, context: Context) {
         nsView.previewLayer.session = session
+        nsView.updateMirroring()
     }
 }
 
@@ -726,6 +774,11 @@ final class PreviewView: NSView {
         let previewLayer = AVCaptureVideoPreviewLayer()
         layer = previewLayer
         return previewLayer
+    }
+
+    func updateMirroring() {
+        guard let connection = previewLayer.connection, connection.isVideoMirroringSupported else { return }
+        connection.isVideoMirrored = false
     }
 }
 
