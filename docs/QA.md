@@ -14,11 +14,13 @@ Copyright: © 2026 Tony Emad. All rights reserved.
 - [x] Enrollment UI exposes automatic capture instead of a manual capture button.
 - [x] Camera preview uses zero-degree native camera orientation and explicitly disables video mirroring.
 - [x] App launch does not show an unsolicited Keychain authentication dialog.
+- [x] Camera denial exposes a recovery action that opens macOS Camera privacy settings.
+- [x] Keychain identity updates are atomic with respect to in-memory state.
 
 Run all automated checks with:
 
 ```sh
-./scripts/verify_release.sh
+./scripts/qa_smoke.sh
 ```
 
 ## Manual Mac checks
@@ -28,7 +30,7 @@ Run all automated checks with:
 - [x] Confirm explicit Open Stark setup restores the panel at the top center.
 - [x] Confirm the Settings window uses readable card sections without clipped text.
 - [ ] Launch the app on an Intel Mac and confirm the panel and camera preview work.
-- [ ] Deny camera permission and confirm Stark explains how to recover it.
+- [ ] Deny camera permission, open Camera Settings, grant permission, and confirm recovery.
 - [ ] Allow camera permission and confirm face presence updates the scan state.
 - [ ] Capture all guided poses automatically and confirm samples persist after relaunch.
 - [ ] Confirm a saved setup can be deleted from Settings.
@@ -38,6 +40,7 @@ Run all automated checks with:
 - [ ] Select an external camera and confirm the live preview switches.
 - [ ] Enable launch-at-login and confirm the setting can be disabled again.
 - [ ] Install the DMG on a clean Mac and confirm the app opens.
+- [ ] Run `./scripts/uninstall_stark.sh --purge` on a disposable test account and confirm the app, identity, and preferences are gone.
 
 ## Adversarial validation before public release
 

@@ -33,6 +33,10 @@ Status: complete for the local MVP; production model audit remains a release gat
 - Replace the prototype feature print with a face-specific audited embedding model.
 - Add stronger consent, re-enrollment, and encrypted-at-rest review before release.
 
+Atomic identity writes, identity serialization tests, and camera permission
+recovery are implemented locally. The audited model and clean-account
+Keychain-failure tests remain release gates.
+
 ## Phase 2 — matching and liveness
 
 Status: complete for the local MVP; adversarial validation remains a release gate.
@@ -42,6 +46,8 @@ Status: complete for the local MVP; adversarial validation remains a release gat
 - Keep the camera preview non-mirrored so movement instructions are unambiguous. (done)
 - Test lighting, glasses, beard changes, printed photos, and screen replay. (manual QA matrix added)
 - Keep manual password recovery available at all times.
+
+The manual cases and evidence fields are listed in `docs/QA_FIXTURES.md`.
 
 ## Phase 3 — lock companion
 
@@ -63,9 +69,10 @@ public Touch ID/password prompt for recovery instead.
 
 ## Phase 5 — release
 
-Status: complete for local release automation; Developer ID credentials remain external.
+Status: complete for local release automation; Developer ID credentials,
+clean-install validation, and external hardware remain release gates.
 
 - Add a production `.icns` icon. (done)
 - Configure Developer ID signing and notarization scripts. (done; credentials remain external)
 - Test Apple Silicon and Intel compatibility if both are supported. (cross-build and universal package verified)
-- Publish privacy, security, recovery, and uninstall documentation. (privacy and security done)
+- Publish privacy, security, recovery, uninstall, QA-fixture, and third-party documentation. (done locally)

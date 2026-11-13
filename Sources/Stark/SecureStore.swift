@@ -91,19 +91,15 @@ final class IdentityStore: ObservableObject {
     var featurePrints: [Data] { identity?.featurePrints ?? [] }
 
     func add(featurePrint: Data) throws {
-        if var identity {
-            identity.featurePrints.append(featurePrint)
-            self.identity = identity
-        } else {
-            identity = FaceIdentity(id: UUID(), createdAt: Date(), featurePrints: [featurePrint])
-            self.identity = identity
-        }
-        try persist()
+        var candidate = identity ?? FaceIdentity(id: UUID(), createdAt: Date(), featurePrints: [])
+        candidate.featurePrints.append(featurePrint)
+        try persist(candidate)
+        identity = candidate
     }
 
     func clear() throws {
-        identity = nil
         try keychain.delete(account: account)
+        identity = nil
     }
 
     private func reload() {
@@ -115,8 +111,7 @@ final class IdentityStore: ObservableObject {
         }
     }
 
-    private func persist() throws {
-        guard let identity else { throw SecureStoreError.invalidData }
+    private func persist(_ identity: FaceIdentity) throws {
         let data = try JSONEncoder().encode(identity)
         try keychain.save(data, account: account)
     }
