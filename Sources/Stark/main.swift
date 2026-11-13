@@ -406,6 +406,9 @@ final class StarkModel: NSObject, ObservableObject {
                 return
             }
             session.addOutput(output)
+            if let connection = output.connection(with: .video) {
+                configureNaturalCameraConnection(connection)
+            }
             currentOutput = output
             session.commitConfiguration()
             isConfigured = true
@@ -737,6 +740,18 @@ enum StarkWindowController {
     }
 }
 
+private func configureNaturalCameraConnection(_ connection: AVCaptureConnection) {
+    if #available(macOS 14.0, *), connection.isVideoRotationAngleSupported(0) {
+        // Mac cameras use their native landscape sensor orientation. Keeping
+        // the capture pipeline at zero degrees prevents rotated face geometry
+        // from reaching Vision and keeps the preview aligned with the scan UI.
+        connection.videoRotationAngle = 0
+    }
+    if connection.isVideoMirroringSupported {
+        connection.isVideoMirrored = false
+    }
+}
+
 struct CameraPreview: NSViewRepresentable {
     let session: AVCaptureSession
 
@@ -777,8 +792,8 @@ final class PreviewView: NSView {
     }
 
     func updateMirroring() {
-        guard let connection = previewLayer.connection, connection.isVideoMirroringSupported else { return }
-        connection.isVideoMirrored = false
+        guard let connection = previewLayer.connection else { return }
+        configureNaturalCameraConnection(connection)
     }
 }
 
