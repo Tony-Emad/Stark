@@ -676,6 +676,10 @@ struct StarkNotchView: View {
                     .frame(width: 174, height: 174)
                 CameraPreview(session: model.session)
                     .frame(width: 124, height: 124)
+                    // Some Mac camera drivers keep the front-camera mirror
+                    // in the preview layer even when the connection reports
+                    // mirroring disabled. Correct the presentation explicitly.
+                    .scaleEffect(x: -1, y: 1)
                     .clipShape(Circle())
                     .overlay(Circle().stroke(.white.opacity(0.18), lineWidth: 1))
             }
@@ -712,6 +716,7 @@ struct StarkNotchView: View {
                 .frame(width: 174, height: 174)
             CameraPreview(session: model.session)
                 .frame(width: 124, height: 124)
+                .scaleEffect(x: -1, y: 1)
                 .clipShape(Circle())
                 .overlay(Circle().stroke(.white.opacity(0.18), lineWidth: 1))
         }
